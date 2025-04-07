@@ -6,34 +6,34 @@ from kerastuner.tuners import RandomSearch
 
 class CNN(keras.Model):
     def __init__(self, num_classes=8, in_channels=1, img_size=64, 
-                 first_filters=32, filters_multiplier=2, dense_neurons=128, dropout_rate=0.3):
+                 kernel_size=3, first_filters=32, filters_multiplier=2, pool_size=2, dense_neurons=128, 
+                 dropout_rate=0.3, num_layers=3):
         super(CNN, self).__init__()
         self.img_size = img_size
+        self.num_layers = num_layers
 
-        # Calculate filters for each layer based on the multiplier
-        second_filters = first_filters * filters_multiplier
-        third_filters = second_filters * filters_multiplier
+        # Create feature extraction layers dynamically
+        layers_list = []
+        current_filters = first_filters
+        
+        for i in range(num_layers):
+            # Add Conv2D layer
+            layers_list.append(
+                layers.Conv2D(current_filters, kernel_size=kernel_size, strides=1, 
+                            padding='same', activation='relu')
+            )
+            # Add BatchNormalization
+            layers_list.append(layers.BatchNormalization())
+            # Add MaxPooling
+            layers_list.append(layers.MaxPool2D(pool_size=pool_size, strides=pool_size))
+            
+            # Update filters for next layer
+            current_filters = current_filters * filters_multiplier
+        
+        self.features = keras.Sequential(layers_list)
 
-        # Feature extraction layers
-        self.features = keras.Sequential([
-            # First conv layer
-            layers.Conv2D(first_filters, kernel_size=3, strides=1, padding='same', activation='relu'),
-            layers.BatchNormalization(),
-            layers.MaxPool2D(pool_size=2, strides=2),
-
-            # Second conv layer
-            layers.Conv2D(second_filters, kernel_size=3, strides=1, padding='same', activation='relu'),
-            layers.BatchNormalization(),
-            layers.MaxPool2D(pool_size=2, strides=2),
-
-            # Third conv layer
-            layers.Conv2D(third_filters, kernel_size=3, strides=1, padding='same', activation='relu'),
-            layers.BatchNormalization(),
-            layers.MaxPool2D(pool_size=2, strides=2)
-        ])
-
-        # Calculate feature size after 3 pooling layers
-        feature_size = img_size // 8
+        # Calculate feature size after n pooling layers (each pooling divides by 2)
+        feature_size = img_size // (2 ** num_layers)
 
         # Classification layers
         self.classifier = keras.Sequential([
